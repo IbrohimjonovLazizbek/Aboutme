@@ -376,7 +376,7 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
       posAttr.needsUpdate = true;
 
       // Smoothly damp actorGroup position & rotation to match the scroll stage pose + fluid breathing sway
-      const poseDamp = isSoftwareGl ? 14.0 : 5.5;
+      const poseDamp = 5.5;
       actorGroup.position.x = THREE.MathUtils.damp(
         actorGroup.position.x,
         pose.bustX,
