@@ -66,14 +66,22 @@ export default function App() {
 
   // Sync window scroll inside the 420vh stage container with scrollProgress [0..1]
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      const stageEl = document.getElementById('particle-self-stage-track');
-      if (!stageEl) return;
-      const rect = stageEl.getBoundingClientRect();
-      const scrollableDistance = Math.max(1, stageEl.offsetHeight - window.innerHeight);
-      const scrolled = Math.max(0, -rect.top);
-      const progress = Math.min(1, Math.max(0, scrolled / scrollableDistance));
-      setScrollProgress(progress);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const stageEl = document.getElementById('particle-self-stage-track');
+          if (stageEl) {
+            const rect = stageEl.getBoundingClientRect();
+            const scrollableDistance = Math.max(1, stageEl.offsetHeight - window.innerHeight);
+            const scrolled = Math.max(0, -rect.top);
+            const progress = Math.min(1, Math.max(0, scrolled / scrollableDistance));
+            setScrollProgress(progress);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });

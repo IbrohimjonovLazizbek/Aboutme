@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   computeScrollCameraPose,
   LightingPaletteId,
@@ -19,7 +18,9 @@ interface ParticleSelfCanvasProps {
   scrollProgress: number;
 }
 
-const PARTICLE_COUNT = 30000;
+const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+const PARTICLE_COUNT = isMobile ? 16000 : 26000;
+const PARTICLE_SIZE = isMobile ? 0.036 : 0.030;
 
 // Pre-allocated module-scope math scratch objects (Zero-GC render loop)
 const _pointerVec = new THREE.Vector3();
@@ -83,16 +84,6 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
     const container = canvasMountRef.current;
     if (!container) return;
 
-    const isSoftwareGl = (() => {
-      const gl = document.createElement('canvas').getContext('webgl2');
-      if (!gl) return true;
-      const ext = gl.getExtension('WEBGL_debug_renderer_info');
-      const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
-      const gpu = String(gl.getParameter(param));
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
-      return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
-    })();
-
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
 
@@ -106,30 +97,20 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
     camera.lookAt(0, -0.08, 0);
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
+      antialias: true,
       alpha: true,
       powerPreference: 'high-performance',
+      precision: 'mediump',
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.22;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setSize(width, height);
     renderer.setClearColor(0x000000, 0);
 
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
-
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmremGenerator.dispose();
-
-    const hemiLight = new THREE.HemisphereLight(0xa5b4fc, 0x18181b, 0.95);
-    scene.add(hemiLight);
-
-    const warmKeyLight = new THREE.DirectionalLight(0xfff3d1, 2.2);
-    warmKeyLight.position.set(2.8, -0.5, 3.2);
-    scene.add(warmKeyLight);
 
     // Pure volumetric point-cloud group — NO black mannequin or internal occlusion mesh
     const actorGroup = new THREE.Group();
@@ -159,11 +140,11 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
     geometry.setAttribute('color', colorAttr);
 
     const voxelTexture = createFluidParticleSpriteTexture(
-      renderer.capabilities.getMaxAnisotropy()
+      Math.min(renderer.capabilities.getMaxAnisotropy(), 4)
     );
 
     const pointsMaterial = new THREE.PointsMaterial({
-      size: 0.030,
+      size: PARTICLE_SIZE,
       map: voxelTexture,
       vertexColors: true,
       transparent: true,
@@ -177,9 +158,7 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
     particleSystem.frustumCulled = false;
     actorGroup.add(particleSystem);
 
-    if (!isSoftwareGl) {
-      renderer.compile(scene, camera);
-    }
+    renderer.compile(scene, camera);
 
     let targetPointerX = 0;
     let targetPointerY = 0;
@@ -187,11 +166,21 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
     let smoothPointerY = 0;
     let pointerActive = false;
 
+    // Cache canvas client rect to eliminate getBoundingClientRect layout thrashing on pointermove
+    let cachedRect = { left: 0, top: 0, width, height };
+    const updateCachedRect = () => {
+      if (!renderer.domElement) return;
+      const r = renderer.domElement.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        cachedRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+      }
+    };
+    updateCachedRect();
+
     const onPointerMove = (e: PointerEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      targetPointerX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      targetPointerY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      if (cachedRect.width === 0 || cachedRect.height === 0) return;
+      targetPointerX = ((e.clientX - cachedRect.left) / cachedRect.width) * 2 - 1;
+      targetPointerY = -((e.clientY - cachedRect.top) / cachedRect.height) * 2 + 1;
       pointerActive = true;
     };
 
@@ -201,6 +190,7 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
 
     window.addEventListener('pointermove', onPointerMove, { passive: true });
     window.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    window.addEventListener('scroll', updateCachedRect, { passive: true });
 
     const onResize = () => {
       if (!container) return;
@@ -209,34 +199,13 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
-      renderer.render(scene, camera);
+      updateCachedRect();
     };
-    window.addEventListener('resize', onResize);
+    window.addEventListener('resize', onResize, { passive: true });
 
     let frameId = 0;
     let isDisposed = false;
     const clock = new THREE.Clock();
-
-    function afterDraw(cb: () => void) {
-      const gl = renderer.getContext() as WebGL2RenderingContext;
-      if (!gl || typeof gl.fenceSync !== 'function') {
-        frameId = window.setTimeout(cb, 28);
-        return;
-      }
-      const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-      gl.flush();
-      const poll = () => {
-        if (isDisposed) return;
-        const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
-        if (state === gl.UNSIGNALED) {
-          frameId = window.setTimeout(poll, 4);
-        } else {
-          if (sync) gl.deleteSync(sync);
-          frameId = window.setTimeout(cb, 24);
-        }
-      };
-      frameId = window.setTimeout(poll, 4);
-    }
 
     function tick() {
       if (isDisposed) return;
@@ -284,8 +253,26 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
       // Silky spring interpolation for fluid trailing motion
       const lerpFactor = 1 - Math.exp(-5.4 * dt);
       const dispAmount = Math.max(0, disp);
-      const breathPulse = 1 + Math.sin(elapsed * 1.6) * 0.015;
+      const e16 = elapsed * 1.6;
+      const breathPulse = 1 + Math.sin(e16) * 0.015;
       const baseFluidAmp = 0.015 + dispAmount * 0.065;
+      const facialFluidAmp = baseFluidAmp * 0.24;
+      const nonFacialFluidAmp = baseFluidAmp * 1.12;
+
+      // Pre-hoisted time multipliers to avoid 200,000+ redundant calculations per frame
+      const e12 = elapsed * 1.2;
+      const e155 = elapsed * 1.55;
+      const e18 = elapsed * 1.8;
+      const e20 = elapsed * 2.0;
+      const e21 = elapsed * 2.1;
+      const e22 = elapsed * 2.2;
+      const e24 = elapsed * 2.4;
+      const e26 = elapsed * 2.6;
+      const e30 = elapsed * 3.0;
+      const e34 = elapsed * 3.4;
+      const e36 = elapsed * 3.6;
+      const e38 = elapsed * 3.8;
+      const e50 = elapsed * 5.0;
 
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         const i3 = i * 3;
@@ -298,7 +285,7 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
         // Preserve razor-sharp anatomical detail on the face & ears while flowing lushly on hair, neck & shoulders
         const isFacialFeature =
           mode === 'bust' && Math.abs(tx) < 0.66 && ty > -0.16 && ty < 0.86 && tz > -0.12;
-        const localFluidAmp = isFacialFeature ? baseFluidAmp * 0.24 : baseFluidAmp * 1.12;
+        const localFluidAmp = isFacialFeature ? facialFluidAmp : nonFacialFluidAmp;
         const swirlScale = isFacialFeature ? 0.32 : 1.0;
 
         // 4 Distinct Randomized Scatter & Flow Animation Styles:
@@ -307,20 +294,20 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
           const vortexAngle =
             (0.18 + dispAmount * 0.72) *
             swirlScale *
-            Math.sin(elapsed * 1.55 + ty * 2.6 + phase * 0.5);
+            Math.sin(e155 + ty * 2.6 + phase * 0.5);
           const cosV = Math.cos(vortexAngle);
           const sinV = Math.sin(vortexAngle);
           const rx = tx * cosV - tz * sinV;
           const rz = tx * sinV + tz * cosV;
-          const radialFlare = 1 + dispAmount * 0.30 * swirlScale * Math.cos(phase + elapsed * 1.8);
+          const radialFlare = 1 + dispAmount * 0.30 * swirlScale * Math.cos(phase + e18);
           tx = rx * radialFlare;
           tz = rz * radialFlare;
-          ty += Math.sin(elapsed * 2.2 + phase) * localFluidAmp * 1.35;
+          ty += Math.sin(e22 + phase) * localFluidAmp * 1.35;
         } else if (sType === 'pulse') {
           // 2. QUANTUM PULSE: Rhythmic radial shockwave expansion from center
           const distFromCore = Math.sqrt(tx * tx + ty * ty + tz * tz) + 0.001;
           const shockwave =
-            Math.sin(distFromCore * 6.5 - elapsed * 3.4 + phase * 0.35) *
+            Math.sin(distFromCore * 6.5 - e34 + phase * 0.35) *
             (0.022 + dispAmount * 0.16) *
             swirlScale;
           tx += (tx / distFromCore) * shockwave;
@@ -329,32 +316,32 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
         } else if (sType === 'cascade') {
           // 3. VOXEL CASCADE: Digital scanline shimmer & vertical matrix stream
           const bandShift =
-            Math.sin(Math.round(ty * 18) * 1.7 + elapsed * 3.0 + phase) *
+            Math.sin(Math.round(ty * 18) * 1.7 + e30 + phase) *
             (0.018 + dispAmount * 0.14) *
             swirlScale;
           const verticalDrift =
-            Math.cos(tx * 7.0 - elapsed * 2.6 + phase) * (0.016 + dispAmount * 0.11) * swirlScale;
+            Math.cos(tx * 7.0 - e26 + phase) * (0.016 + dispAmount * 0.11) * swirlScale;
           tx += bandShift;
           ty += verticalDrift;
-          tz += Math.sin(tx * 5.2 + elapsed * 2.2 + phase) * localFluidAmp;
+          tz += Math.sin(tx * 5.2 + e22 + phase) * localFluidAmp;
         } else {
           // 4. FLUID CURL (Default): 3D Multi-Frequency Harmonic Fluid Flow Field
           const waveX =
-            Math.sin(ty * 4.4 - elapsed * 2.4 + phase) * 0.65 +
-            Math.cos(tz * 3.8 + elapsed * 1.8 + phase * 0.5) * 0.35;
+            Math.sin(ty * 4.4 - e24 + phase) * 0.65 +
+            Math.cos(tz * 3.8 + e18 + phase * 0.5) * 0.35;
           const waveY =
-            Math.cos(tx * 4.0 + elapsed * 2.0 + phase * 0.8) * 0.6 +
-            Math.sin((tx + tz) * 3.4 - elapsed * 2.2 + phase) * 0.4;
+            Math.cos(tx * 4.0 + e20 + phase * 0.8) * 0.6 +
+            Math.sin((tx + tz) * 3.4 - e22 + phase) * 0.4;
           const waveZ =
-            Math.sin(tx * 4.2 - elapsed * 2.1 + phase * 1.2) * 0.6 +
-            Math.cos(ty * 3.6 + elapsed * 1.6 + phase) * 0.4;
+            Math.sin(tx * 4.2 - e21 + phase * 1.2) * 0.6 +
+            Math.cos(ty * 3.6 + e16 + phase) * 0.4;
 
           tx += waveX * localFluidAmp;
           ty += waveY * localFluidAmp;
           tz += waveZ * localFluidAmp;
 
           if (dispAmount > 0.02) {
-            const swirlAngle = dispAmount * 0.32 * swirlScale * Math.sin(elapsed * 1.2 + phase);
+            const swirlAngle = dispAmount * 0.32 * swirlScale * Math.sin(e12 + phase);
             const cosS = Math.cos(swirlAngle);
             const sinS = Math.sin(swirlAngle);
             const rx = tx * cosS - tz * sinS;
@@ -374,7 +361,7 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
           if (distSq < 0.45) {
             const dist = Math.sqrt(distSq);
             const falloff = Math.exp(-distSq * 6.5);
-            const ripple = Math.sin(dist * 14.0 - elapsed * 5.0) * 0.032 * falloff;
+            const ripple = Math.sin(dist * 14.0 - e50) * 0.032 * falloff;
             tx += (-dy * 0.22 + dx * 0.14) * falloff + ripple;
             ty += (dx * 0.22 + dy * 0.14) * falloff + ripple;
             tz += falloff * 0.085 + ripple;
@@ -438,12 +425,7 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
       );
 
       renderer.render(scene, camera);
-
-      if (isSoftwareGl) {
-        afterDraw(tick);
-      } else {
-        frameId = requestAnimationFrame(tick);
-      }
+      frameId = requestAnimationFrame(tick);
     }
 
     tick();
@@ -451,10 +433,10 @@ export const ParticleSelfCanvas: React.FC<ParticleSelfCanvasProps> = ({
     return () => {
       isDisposed = true;
       cancelAnimationFrame(frameId);
-      clearTimeout(frameId);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerleave', onPointerLeave);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', updateCachedRect);
 
       geometry.dispose();
       pointsMaterial.dispose();
