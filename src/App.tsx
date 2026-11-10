@@ -13,7 +13,6 @@ import {
 } from './utils/profileAndPrompt';
 import { TopNav } from './components/TopNav';
 import { ParticleSelfCanvas } from './components/ParticleSelfCanvas';
-import { BottomControlDock } from './components/BottomControlDock';
 import { ProjectModal } from './components/ProjectModal';
 
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -716,23 +715,6 @@ export default function App() {
           </div>
         </div>
       </main>
-
-      {/* Collapsible Ergonomic Bottom Control Dock with Stage Switcher & Auto-Play */}
-      <BottomControlDock
-        activeStage={activeStage}
-        onSelectStage={jumpToStage}
-        isAutoPlaying={isAutoPlaying}
-        onToggleAutoPlay={() => setIsAutoPlaying((prev) => !prev)}
-        morphMode={morphMode}
-        onChangeMorphMode={setMorphMode}
-        scatterType={scatterType}
-        onChangeScatterType={setScatterType}
-        onRandomize={randomizeParticleState}
-        paletteId={paletteId}
-        onChangePaletteId={setPaletteId}
-        dispersion={dispersion}
-        onChangeDispersion={setDispersion}
-      />
 
       {/* Lightbox Modal for Selected Works */}
       <ProjectModal
