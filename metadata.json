@@ -1,0 +1,6 @@
+{
+  "name": "Particle Self — 3D Identity & Antigravity Prompt Studio",
+  "description": "Scroll-driven 3D particle portrait portfolio inspired by MotionSites Particle Self, complete with a live personal info customizer and Antigravity AI prompt generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
