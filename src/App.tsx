@@ -65,19 +65,30 @@ export default function App() {
   }, []);
 
   // Sync window scroll inside the 420vh stage container with scrollProgress [0..1]
+  // Zero layout-thrashing: measures stage geometry once on mount & resize, reads passive window.scrollY on scroll
   useEffect(() => {
     let ticking = false;
+    let stageEl = document.getElementById('particle-self-stage-track');
+    let cachedOffsetTop = stageEl ? stageEl.offsetTop : 0;
+    let cachedScrollableDist = stageEl
+      ? Math.max(1, stageEl.offsetHeight - window.innerHeight)
+      : 1;
+
+    const measureStage = () => {
+      stageEl = document.getElementById('particle-self-stage-track');
+      if (stageEl) {
+        cachedOffsetTop = stageEl.offsetTop;
+        cachedScrollableDist = Math.max(1, stageEl.offsetHeight - window.innerHeight);
+      }
+    };
+
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          const stageEl = document.getElementById('particle-self-stage-track');
-          if (stageEl) {
-            const rect = stageEl.getBoundingClientRect();
-            const scrollableDistance = Math.max(1, stageEl.offsetHeight - window.innerHeight);
-            const scrolled = Math.max(0, -rect.top);
-            const progress = Math.min(1, Math.max(0, scrolled / scrollableDistance));
-            setScrollProgress(progress);
-          }
+          const currentY = window.scrollY || window.pageYOffset || 0;
+          const scrolled = Math.max(0, currentY - cachedOffsetTop);
+          const progress = Math.min(1, Math.max(0, scrolled / cachedScrollableDist));
+          setScrollProgress(progress);
           ticking = false;
         });
         ticking = true;
@@ -85,8 +96,14 @@ export default function App() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', measureStage, { passive: true });
+    measureStage();
     handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', measureStage);
+    };
   }, []);
 
   // Optional Cinema Auto-Play loop that smoothly sweeps through all 4 stages on the main head
