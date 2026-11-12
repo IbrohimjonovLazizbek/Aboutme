@@ -186,12 +186,16 @@ export default function App() {
       data-palette={paletteId}
       className="min-h-screen bg-[#050505] text-[#F4F4F6] selection:bg-[#E2FF32] selection:text-[#050505] overflow-x-clip"
     >
-      {/* 3-Zone Top Bar Contract */}
+      {/* Compact Floating Top Nav (Zero Full-Width Blocking, 100% 3D View Visible) */}
       <TopNav
         brandWordmark={profile.brandWordmark}
         email={profile.email}
         activeStage={activeStage}
         onSelectStage={jumpToStage}
+        morphMode={morphMode}
+        scatterType={scatterType}
+        onRandomize={randomizeParticleState}
+        statusText={profile.statusListeningText}
       />
 
       <main>
@@ -272,67 +276,7 @@ export default function App() {
               </div>
 
               {/* Layer 3 (z-30): Stage-Driven Spatial HUD Overlays Appearing Around the 3D Head */}
-              <div className="relative z-30 w-full h-full pointer-events-none flex flex-col justify-between pt-14 sm:pt-16 md:pt-16 pb-24 sm:pb-32 lg:pb-28 px-3.5 sm:px-6 md:px-12 max-w-[1440px] mx-auto">
-                {/* Top-Center Subtle OS Telemetry Bar (Matches reference video top bar) */}
-                <div className="w-full flex items-center justify-center">
-                  <div className="pointer-events-auto inline-flex items-center gap-2.5 sm:gap-4 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-[#121218]/90 border border-white/10 text-[11px] sm:text-xs text-zinc-300 shadow-lg max-w-full overflow-x-auto">
-                    <button
-                      type="button"
-                      onClick={randomizeParticleState}
-                      className="font-mono-code text-[#E2FF32] hover:underline underline-offset-2 shrink-0 cursor-pointer"
-                      title="Click to randomize 3D morph & scatter animation"
-                    >
-                      🎲 {morphMode === 'architecture' ? 'VOXEL' : morphMode.toUpperCase()} ·{' '}
-                      {SCATTER_ANIMATION_LABELS[scatterType]}
-                    </button>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-medium text-white whitespace-nowrap shrink-0">
-                      {profile.statusListeningText}
-                    </span>
-                    <span className="hidden sm:inline text-zinc-600" aria-hidden="true">
-                      |
-                    </span>
-                    <div className="hidden sm:flex items-center gap-3 text-zinc-400 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => jumpToStage(0)}
-                        className={`hover:text-white transition-colors cursor-pointer ${
-                          activeStage === 0 ? 'text-white font-medium' : ''
-                        }`}
-                      >
-                        Status
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => jumpToStage(1)}
-                        className={`hover:text-white transition-colors cursor-pointer ${
-                          activeStage === 1 ? 'text-white font-medium' : ''
-                        }`}
-                      >
-                        Memory
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => jumpToStage(2)}
-                        className={`hover:text-white transition-colors cursor-pointer ${
-                          activeStage === 2 ? 'text-white font-medium' : ''
-                        }`}
-                      >
-                        Focus & Works
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => jumpToStage(3)}
-                        className={`hover:text-white transition-colors cursor-pointer ${
-                          activeStage === 3 ? 'text-white font-medium' : ''
-                        }`}
-                      >
-                        Monolith
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="relative z-30 w-full h-full pointer-events-none flex flex-col justify-end pb-24 sm:pb-32 lg:pb-28 px-3.5 sm:px-6 md:px-12 max-w-[1440px] mx-auto">
                 {/* MIDDLE / LOWER STAGE CONTENT OVERLAYS */}
                 <div className="mt-auto lg:my-auto w-full">
                   <AnimatePresence mode="wait">

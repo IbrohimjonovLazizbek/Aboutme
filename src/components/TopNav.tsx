@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
+import { ParticleMorphMode, ScatterAnimationType } from '../utils/profileAndPrompt';
 
 interface TopNavProps {
   brandWordmark: string;
   email: string;
   activeStage: 0 | 1 | 2 | 3;
   onSelectStage: (stageIndex: 0 | 1 | 2 | 3) => void;
+  morphMode: ParticleMorphMode;
+  scatterType?: ScatterAnimationType;
+  onRandomize: () => void;
+  statusText?: string;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
@@ -12,18 +17,18 @@ export const TopNav: React.FC<TopNavProps> = ({
   email,
   activeStage,
   onSelectStage,
+  morphMode,
+  onRandomize,
+  statusText,
 }) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   const navItems: { label: string; shortLabel: string; stage: 0 | 1 | 2 | 3 }[] = [
-    { label: 'Identity', shortLabel: '01. Identity', stage: 0 },
-    { label: 'Memory & Bio', shortLabel: '02. Memory & Bio', stage: 1 },
-    { label: 'Focus & Works', shortLabel: '03. Focus & Works', stage: 2 },
-    { label: 'Quiet Place', shortLabel: '04. Quiet Place', stage: 3 },
+    { label: 'Identity', shortLabel: 'Identity', stage: 0 },
+    { label: 'Memory & Bio', shortLabel: 'Memory', stage: 1 },
+    { label: 'Focus & Works', shortLabel: 'Works', stage: 2 },
+    { label: 'Quiet Place', shortLabel: 'Quiet', stage: 3 },
   ];
-
-  const activeItem = navItems.find((item) => item.stage === activeStage) || navItems[0];
 
   const handleCopyEmail = async () => {
     try {
@@ -36,104 +41,79 @@ export const TopNav: React.FC<TopNavProps> = ({
     }
   };
 
+  const modeLabel = morphMode === 'architecture' ? 'VOXEL' : morphMode.toUpperCase();
+
   return (
-    <header className="fixed top-0 inset-x-0 z-40 bg-[#050505]/90 border-b border-white/[0.08]">
-      <div className="flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-6 md:px-10 py-2.5 sm:py-3.5 max-w-[1440px] mx-auto">
-        {/* Zone 1: Single text element wordmark */}
+    <header className="fixed top-2.5 sm:top-3.5 inset-x-0 z-50 flex justify-center px-2 sm:px-4 pointer-events-none">
+      <nav
+        aria-label="Compact Top Navigation"
+        className="pointer-events-auto inline-flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-1.5 rounded-full bg-[#050505]/70 backdrop-blur-md border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.65)] text-xs max-w-full overflow-x-auto"
+      >
+        {/* Brand Wordmark */}
         <a
           href="#stage-top"
           onClick={(e) => {
             e.preventDefault();
-            setMobileMenuOpen(false);
             onSelectStage(0);
           }}
-          className="font-display text-base sm:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0"
+          className="font-display text-xs sm:text-sm font-bold tracking-tight text-white hover:text-[#E2FF32] transition-colors whitespace-nowrap shrink-0 pl-1"
         >
           {brandWordmark}
         </a>
 
-        {/* Zone 2: 4 clean single-line text navigation links on Tablet & Desktop */}
-        <nav
-          aria-label="Primary Navigation"
-          className="hidden md:flex items-center gap-4 lg:gap-7 text-xs lg:text-sm font-medium text-zinc-400"
-        >
-          {navItems.map((item) => {
-            const isCurrent = activeStage === item.stage;
-            return (
-              <a
-                key={item.label}
-                href={`#stage-${item.stage}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSelectStage(item.stage);
-                }}
-                className={`hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 ${
-                  isCurrent ? 'text-white underline decoration-[#E2FF32]' : ''
-                }`}
-              >
-                {item.label}
-              </a>
-            );
-          })}
-        </nav>
+        <span className="text-white/15 shrink-0 select-none" aria-hidden="true">|</span>
 
-        {/* Zone 3: Primary action + Mobile Stage Drawer Toggle */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-            aria-expanded={mobileMenuOpen}
-            aria-label="Toggle mobile navigation menu"
-            className="md:hidden px-2.5 py-1.5 text-xs font-medium text-zinc-200 bg-[#12121A] border border-white/15 rounded-lg hover:border-white/30 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            {activeItem.label} {mobileMenuOpen ? '▴' : '▾'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCopyEmail}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-semibold text-[#050505] bg-[#E2FF32] rounded-lg hover:bg-[#d4f224] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            {copiedEmail ? (
-              '✓ Email Copied'
-            ) : (
-              <>
-                <span className="hidden sm:inline">Get in Touch</span>
-                <span className="sm:hidden">Contact</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Dropdown Drawer for Phones (< 768px) */}
-      {mobileMenuOpen && (
-        <nav
-          aria-label="Mobile Stage Navigation"
-          className="md:hidden px-4 pt-2 pb-3 bg-[#09090E] border-t border-white/10 grid grid-cols-2 gap-2"
-        >
+        {/* Compact Stage Navigation Text & Buttons */}
+        <div className="flex items-center gap-1 shrink-0">
           {navItems.map((item) => {
             const isCurrent = activeStage === item.stage;
             return (
               <button
                 key={item.stage}
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onSelectStage(item.stage);
-                }}
-                className={`text-left px-3 py-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                onClick={() => onSelectStage(item.stage)}
+                className={`px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs transition-all whitespace-nowrap cursor-pointer ${
                   isCurrent
-                    ? 'bg-white text-[#050505] border-white font-semibold'
-                    : 'bg-[#12121A] text-zinc-300 border-white/10 hover:text-white'
+                    ? 'bg-white text-[#050505] font-semibold shadow-sm'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/5 font-medium'
                 }`}
               >
-                {item.shortLabel}
+                <span className="hidden sm:inline">{item.label}</span>
+                <span className="sm:hidden">{item.shortLabel}</span>
               </button>
             );
           })}
-        </nav>
-      )}
+        </div>
+
+        {statusText && (
+          <span className="hidden lg:inline text-zinc-400 text-[11px] font-normal truncate max-w-[200px] shrink-0">
+            · {statusText}
+          </span>
+        )}
+
+        <span className="text-white/15 shrink-0 select-none" aria-hidden="true">|</span>
+
+        {/* Compact 3D Mode Randomizer Button */}
+        <button
+          type="button"
+          onClick={onRandomize}
+          className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-medium text-[#E2FF32] bg-[#E2FF32]/10 hover:bg-[#E2FF32]/20 border border-[#E2FF32]/25 transition-all whitespace-nowrap cursor-pointer shrink-0"
+          title="Click to randomize 3D particle morphology & scatter animation"
+        >
+          🎲 {modeLabel}
+        </button>
+
+        <span className="text-white/15 shrink-0 select-none" aria-hidden="true">|</span>
+
+        {/* Compact Action Button */}
+        <button
+          type="button"
+          onClick={handleCopyEmail}
+          className="px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-[#050505] bg-[#E2FF32] rounded-full hover:bg-[#d4f224] transition-all whitespace-nowrap cursor-pointer shrink-0 shadow-sm"
+        >
+          {copiedEmail ? '✓ Copied' : 'Get in Touch'}
+        </button>
+      </nav>
     </header>
   );
 };
